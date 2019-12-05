@@ -1,0 +1,2 @@
+# Reservation_app_form_submit_counter
+送信された項目は削除して残が0になったらリスト事削除する
