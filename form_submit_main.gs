@@ -1,13 +1,28 @@
 /**
-* トリガーをかけないと実行されない。
+* Form送信時トリガーをかけないと実行されない。
 * Formが送信されたら回答されたリストアイテムは削除する。
 * プルダウンメニュー + 日時に項目名に「(残n)」回答が来たら-1　桁数制限なし
-* 作成：2019.12.9
+*
+* 作成：2019.12.9　ライブラリ Ver002
+* 
+* 他ファイルで実ライブラリの読み込みで利用するために内容を関数の中に収めた
 */
 //https://www.lifull.blog/entry/2018/12/10/182307
 //https://qiita.com/soundTricker/items/42266e56c0212ce6b997
 function onFormSubmit(e){
 
+  fncounterListItem(e);
+    
+}
+/**
+* Formが送信されたら回答されたリストアイテムは削除する。
+* プルダウンメニュー + 日時に項目名に「(残n)」回答が来たら-1　桁数制限なし
+*
+* @param {object} e Formの回答
+* return なし
+* 作成：2019.12.10
+*/
+function fncounterListItem(e){
   var frm = e.source;
   var itemResponses = e.response.getItemResponses();
   var titles=[];
@@ -66,5 +81,5 @@ function onFormSubmit(e){
     }//for2
     
   }//for1
-    
+
 }
