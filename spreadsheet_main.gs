@@ -5,13 +5,67 @@
 * 残数をチェックして内容に合わせたメールを送信する。
 * 紐付けシートの名称はデフォルトのままとする("フォームの回答 1")
 * メール送信記録シートの名前は"メール送信記録"とする。
-* メール本文は"本文"シートとする
+* メール本文は"本文"シートとする、ユーザー手動作成
 * 列0:タイムスタンプ 列1:アドレス 列2:名前　前提条件
 * 残2以上でもフォームを開いている人が何にもいて送信するとインスタンス扱いのようなので全てその値で送信記録される。
 * そのため全数という最大数設定が判断には必要
 * 全数は途中で変更可能
 */
-function fnConfirmMail(e){
+function onFormSubmit(e) {
+
+  GASTooL01formApplicationCounter.fncounterListItem(e)
+  
+}
+function test(){
+var maxnum={start:'pp'};
+var datas=[
+['かば','Apple','Orange'],
+['かば','Orange','Apple']
+];
+
+  var indexlists=[];//ターゲット項目(時間)列群 
+  for(var i=0;i<datas.length;i++){//
+    for(var j=0;j<datas[i].length;j++){
+      var inumstart = datas[i][j].indexOf(maxnum.start);//1文字は目は0番目 
+      Logger.log(inumstart + ' ' + datas[i][j]);
+       if(-1<inumstart){
+        indexlists.push(j);//配列のindex番号リストをセット
+      }
+    }
+  }
+  Logger.log(indexlists);
+}
+function testMax(){
+  var data='10時［全 2］（残 2）';
+  var maxnum = {start:'［全 ',last:'］'};
+  var max = fnMaxNumber(data,maxnum);
+  Logger.log(max);
+}
+/**
+ * 文字列から引数キーワードに囲まれた桁数を抽出する
+ * @param String data
+ * @param Array maxnum 連想配列
+ *　return Number max
+ * 
+ */
+function fnMaxNumber(data,maxnum){
+
+  var inumstart =data.indexOf(maxnum.start);//1文字は目は0番目 全開始キーワードの最初の文字が見つかった位置
+  var inumlast =data.indexOf(maxnum.last);//1文字は目は0番目　全終了キーワードの最初の文字が見つかった位置
+  var temp_start = maxnum.start;
+  var maxnum_start_len = temp_start.length
+  var temp_last = maxnum.last;
+  var maxnum_last_len = temp_last.length
+  var pos_start= inumstart + maxnum_start_len;//桁数抽出 開始位置
+  var maxlen = inumlast-pos_start;//桁数
+  var max=Number(data.substr(pos_start,maxlen));//該当の全数
+  
+  return max;
+  
+}
+
+
+function fnConfirmMail2(){
 
   var ss =SpreadsheetApp.getActiveSpreadsheet();
   
@@ -30,46 +84,59 @@ function fnConfirmMail(e){
   ssends =  ssends.filter(function(e){return e[0] !== "";});//空の要素を削除する  
   var mailrecordtitle = ['送信時間','メールアドレス','宛先名','可否'];
   mailrecordtitle.map(function(title,index){
-    ssend.getRange(1,index+1).setValue(title);
+    shsend.getRange(1,index+1).setValue(title);
   });
   if(ssends.length<2){//シート作成時のみ実行　初回答時に送信させるため。
-    var m = Moment.moment(); //作成日時
-    var mailrecordinitialdata = [m,'サンプル','サンプル','OK'];
+    var m = Moment.moment(); //作成日時    
+    var mailrecordinitialdata = [m.format('YYYY/MM/DD HH:mm:ss'),'サンプル','サンプル','OK'];
     mailrecordinitialdata.map(function(title,index){
-      shsend.getRange(1,index+1).setValue(title);
+      shsend.getRange(2,index+1).setValue(title);
     });
+  }
+  
+  var MAILCONTENTS_SHEET = '本文';
+  try{
+    var sscontents= ss.getSheetByName(MAILCONTENTS_SHEET).getDataRange().getValues(); 
+    //2行目:OK 3行目:NGの場合のメール内容
+    var ok_contents = {judge:sscontents[1][0],subject:sscontents[1][1],content:sscontents[1][2]};
+    var ng_contents = {judge:sscontents[2][0],subject:sscontents[2][1],content:sscontents[2][2]};
+  }catch(e){
+    var msg='「本文」シートがありません、作成願います';
+    Browser.msgBox(msg);
+    return
   }
   
   var FORMRET_SHEET = 'フォームの回答 1';
   var ssdatas = ss.getSheetByName(FORMRET_SHEET).getDataRange().getValues(); 
   var ssform=ss.getSheetByName(FORMRET_SHEET);
-  var addcol=1;//メールアドレスはB列
+  var addcol=9;//メールアドレスはB列
   var namecol=2;//宛名はC列  
-  ssdatas = ssdatas.filter(function(e){return e[0] !== "";});//空の要素を削除する
+  var datatitle = ssdatas.splice(0, 1)[0];
+  ssdatas = ssdatas.filter(function(e){return e[0] !== "";});//空の要素を削除する 
   
-  var MAILCONTENTS_SHEET = '本文';
-  var sscontents= ss.getSheetByName(MAILCONTENTS_SHEET).getDataRange().getValues(); 
-  //2行目:OK 3行目:NGの場合のメール内容
-  var ok_contents = {judge:sscontents[1][0],subject:sscontents[1][1],content:sscontents[1][2]};
-  var ng_contents = {judge:sscontents[2][0],subject:sscontents[2][1],content:sscontents[2][2]};
+  //回答データがないときは処理を終了
+  if(ssdatas.length<1){
+    return;
+  }
   
+  //回答データがある時は以下を実行
   var maxnum = {start:'［全 ',last:'］'}; //全角括弧開始、全の後半角空白 + 数値n+全角括弧閉じ
   var cntkey = {start:'（残 ',last:'）'};//全角括弧開始、残の後半角空白+数値n+全角括弧閉じ
-  var cntoutnum = 4;//上記の文字列数
-  var datatitle = ssdata.splice(0, 1)[0];
+  var cntoutnum = 4;//上記の文字列数 
   var confirmrows=[];// 
-
-  //申込数が全num以上あるかどうかをチェック
-  var data = ssdatas[0];  
-  var indexlists = data.map(function(value,maxnum,index){
-    var ret=[];//ターゲット項目(時間)列群
-    var inumstart = value.indexOf(maxnum.start);//1文字は目は0番目
-    if(-1<inumstart){
-      ret.push(index);//配列のindex番号リストをセット
-    }
-    return ret;    
-  });
   
+  //申込数が全num以上あるかどうかをチェック
+  var indexlists=[];//ターゲット項目(時間)列群 
+  for(var i=0;i<ssdatas.length;i++){//
+    for(var j=1;j<ssdatas[i].length;j++){
+      var value = ssdatas[i][j] + '';//数値があったら文字化
+      var inumstart = value.indexOf(maxnum.start);//1文字は目は0番目 
+      if(-1<inumstart){
+        indexlists.push(j);//配列のindex番号リストをセット
+      }
+    }
+  }
+  Logger.log(indexlists);
   //項目(時間)列抽出 --A
   for(var i=0;i<indexlists.length;i++){//列数
     var col = indexlists[i];//項目列
@@ -80,14 +147,15 @@ function fnConfirmMail(e){
     //必要データを連想配列化
     for(var j=0;j<ssdatas.length;j++){//1列
       var data = ssdatas[j][col];//セルデータ
-      targetcol.item.push(data.substr(0,data.indexOf(maxnum.start)+1));
-      targetcol.max.push(Number(data.indexOf(maxnum.last))-Number(data.indexOf(maxnum.start)));
-      targetcol.rest.push(Number(data.indexOf(cntkey.last))-Number(data.indexOf(cntkey.start)));      
-      targetcol.row.push(j);
+      targetcol.item=data.substr(0,data.indexOf(maxnum.start));
+      targetcol.max=fnMaxNumber(data,maxnum);
+      targetcol.rest=fnMaxNumber(data,cntkey);     
+      targetcol.row=j;
+      
+      targetcollist.push(targetcol); 
     } 
-
     //グルーピング　項目ごと(10時　など)---B
-    targetcollist.push(targetcol); 
+
     var itemlists=[];
     for(var k=0;k<targetcollist.length;k++){
         
@@ -110,8 +178,11 @@ function fnConfirmMail(e){
           } else {
             return -1;
           }
-        })        
-        var diffnum = targetitems[cat][0].max<targetitems[cat].length
+        })
+        Logger.log('最大'+targetitems[cat][0].max);
+        Logger.log('申込数' + targetitems[cat].length);
+        var diffnum = targetitems[cat][0].max - targetitems[cat].length
+        Logger.log(diffnum);
 
         if(diffnum < 0){//全数より申込数が多い
           for(var m=0;m<diffnum;m++){
@@ -126,30 +197,31 @@ function fnConfirmMail(e){
   
   //前回実行時間後のタイムスタンプ記録行のみ実行
   var maildatas=[];
-  var lastrow=ssends.length;
+  var lastrow=ssends.length-1;
   var lasttime = ssends[lastrow][0];
-  var colmax = ssdatas[0].length;
-  for(var i=1;i<ssdatas.length;i++){//データの数だけ
+  var colmax = ssdatas[0].length+1;
+  for(var i=0;i<ssdatas.length;i++){//データの数だけ
   
+    var irow = i+2;//レンジはタイトル行があり、1スタート
     if(lasttime < ssdatas[i][0]){//未送信のデータ
       var toadd =  ssdatas[i][addcol];
       //該当の宛先にメール送信　＋ 書き込み
       if(0<confirmrows.length){
         for(var j=0;j<confirmrows;j++){
           var strjudge = 'NG';
-          var j = confirmrows[j];
-          ssform.getDataRange(i,colmax).setValue(strjudge);
+          var irow = confirmrows[j];
+          ssform.getRange(irow,colmax).setValue(strjudge);
           var arrcontents = ng_contents;
         }
       }else{
         var strjudge = 'OK';
-        ssform.getDataRange(i,colmax).setValue(strjudge);  
+        ssform.getRange(irow,colmax).setValue(strjudge);  
         var arrcontents = ok_contents;
       }
       var content = createTextMail(toadd,ssdatas[i],arrcontents); 
       
     }
-  }
+  }//データの数だけ
 
 }
 /**
@@ -198,3 +270,4 @@ function sendMail(toadd,subject,content) {
     body: content
   });
 }
+
